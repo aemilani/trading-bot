@@ -4,7 +4,9 @@ from dotenv import dotenv_values
 from datetime import datetime, timedelta
 
 
-# TODO:
+# TODO: Change the "days" input to "start and "end".
+# TODO: Add other columns of the kline data.
+
 config = dotenv_values('.env')
 client = Client(config.get('BINANCE_API_KEY'), config.get('BINANCE_API_SECRET'))
 
@@ -30,33 +32,42 @@ class Dataset:
             '1M'
         ]
 
-    def get_data(self, days: int, ticker: str, ts: str) -> pd.DataFrame():
-        return self._download_data(days=days, ticker=ticker, ts=ts)
+    def get_data(self, ticker: str, tf: str, days: int) -> pd.DataFrame():
+        """
+        Get candlestick data.
+            :param ticker: The trading pair
+            :param tf: Timeframe
+            :param days: Days of data to get
 
-    def _download_data(self, days: int = 10, ticker: str = 'BTCUSDT', ts: str = '1h') -> pd.DataFrame():
-        if ts not in self.time_frames:
-            raise ValueError(f'Support time frames: {self.time_frames}')
-        from_day = self._get_start_day(days=days)
+            :return Candlestick DataFrame
+        """
+        return self._download_data(ticker=ticker, tf=tf, days=days)
+
+    def _download_data(self, ticker: str = 'BTCUSDT', tf: str = '1h', days: int = 10) -> pd.DataFrame():
+        if tf not in self.time_frames:
+            raise ValueError(f'Supported timeframes: {self.time_frames}')
+        start_date = _get_start_time(days=days)
         klines = client.get_historical_klines(
-            ticker, ts, from_day
+            ticker, tf, start_date
         )
-        data = self._convert_to_dataframe(klines)
+        data = _convert_to_dataframe(klines)
         data['symbol'] = ticker
         return data
 
-    def _convert_to_dataframe(self, klines) -> pd.DataFrame():
-        data = pd.DataFrame(
-            data=[row[1:7] for row in klines],
-            columns=['open', 'high', 'low', 'close', 'volume', 'time'],
-        ).set_index('time')
-        data.index = pd.to_datetime(data.index + 1, unit='ms')
-        data = data.sort_index()
-        data = data.apply(pd.to_numeric, axis=1)
-        return data
 
-    def _get_start_day(self, days: int) -> str:
-        end = datetime.now()
-        end = end - timedelta(days=0)
-        start = end - timedelta(days=days)
-        start = start.strftime('%d %b, %Y')
-        return start
+def _get_start_time(days: int) -> str:
+    end = datetime.now()
+    start = end - timedelta(days=days)
+    start = start.strftime('%d %b, %Y')
+    return start
+
+
+def _convert_to_dataframe(klines) -> pd.DataFrame():
+    data = pd.DataFrame(
+        data=[row[1:7] for row in klines],
+        columns=['open', 'high', 'low', 'close', 'volume', 'time'],
+    ).set_index('time')
+    data.index = pd.to_datetime(data.index + 1, unit='ms')
+    data = data.sort_index()
+    data = data.apply(pd.to_numeric, axis=1)
+    return data
