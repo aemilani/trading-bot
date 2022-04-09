@@ -22,11 +22,12 @@ def get_position(entry, sl, risk=0.01, max_pos_pct=0.1):
     return pos_pct, leverage
 
 
-if __name__ =='__main__':
-    entry = float(input('Entry:'))
-    sl = float(input('Stop Loss:'))
-    risk = float(input('Risk (percent of protfolio):')) / 100
-    max_pos_pct = float(input('Max position size (percent of portfolio):')) / 100
-    position = get_position(entry, sl, risk, max_pos_pct)
-    print(f'\nPosition size (percent of portfolio): {position[0]}')
-    print(f'Leverage: {position[1]}')
+if __name__ == '__main__':
+    while True:
+        entry_ = float(input('\nEntry:'))
+        sl_ = float(input('Stop Loss:'))
+        risk_ = float(input('Risk (percent of protfolio):')) / 100
+        max_pos_pct_ = float(input('Max position size (percent of portfolio):')) / 100
+        position = get_position(entry_, sl_, risk_, max_pos_pct_)
+        print(f'\nPosition size (percent of portfolio): {position[0]}')
+        print(f'Leverage: {position[1]}')
