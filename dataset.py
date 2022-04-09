@@ -1,11 +1,9 @@
 import pandas as pd
+import numpy as np
 from binance import Client
 from dotenv import dotenv_values
 from datetime import datetime, timedelta
 
-
-# TODO: Change the "days" input to "start and "end".
-# TODO: Add other columns of the kline data.
 
 config = dotenv_values('.env')
 client = Client(config.get('BINANCE_API_KEY'), config.get('BINANCE_API_SECRET'))
@@ -47,9 +45,7 @@ class Dataset:
         if tf not in self.time_frames:
             raise ValueError(f'Supported timeframes: {self.time_frames}')
         start_date = _get_start_time(days=days)
-        klines = client.get_historical_klines(
-            ticker, tf, start_date
-        )
+        klines = client.get_historical_klines(ticker, tf, start_date)
         data = _convert_to_dataframe(klines)
         data['symbol'] = ticker
         return data
@@ -64,10 +60,12 @@ def _get_start_time(days: int) -> str:
 
 def _convert_to_dataframe(klines) -> pd.DataFrame():
     data = pd.DataFrame(
-        data=[row[1:7] for row in klines],
-        columns=['open', 'high', 'low', 'close', 'volume', 'time'],
+        data=[row[1:11] for row in klines],
+        columns=['open', 'high', 'low', 'close', 'volume', 'time', 'quote asset volume', 'number of trades',
+                 'taker buy base asset volume', 'taker buy quote asset volume'],
     ).set_index('time')
-    data.index = pd.to_datetime(data.index + 1, unit='ms')
+
+    data.index = pd.to_datetime(np.round(data.index / 1000), unit='s')
     data = data.sort_index()
     data = data.apply(pd.to_numeric, axis=1)
     return data
