@@ -1,12 +1,14 @@
+import os
 import pandas as pd
 import numpy as np
 from binance import Client
 from dotenv import dotenv_values
 from datetime import datetime, timedelta
+from dateutil.parser import parse
 
 
 config = dotenv_values('.env')
-client = Client(config.get('BINANCE_API_KEY'), config.get('BINANCE_API_SECRET'))
+binance_client = Client(config.get('BINANCE_API_KEY'), config.get('BINANCE_API_SECRET'))
 
 
 class Dataset:
@@ -30,25 +32,88 @@ class Dataset:
             '1M'
         ]
 
-    def get_data(self, ticker: str, tf: str, days: int) -> pd.DataFrame():
+    def get_data(self, ticker: str = 'BTCUSDT', interval: str = '1h', days_of_data: int = None,
+                 start_date: str = None, end_date: str = None) -> pd.DataFrame():
         """
         Get candlestick data.
             :param ticker: The trading pair
-            :param tf: Timeframe
-            :param days: Days of data to get
+            :param interval: Timeframe
+            :param days_of_data: Days of data to get
+            :param start_date: Should be provided if days_of_data is not provided
+            :param end_date: Should be provided if days_of_data is not provided
 
             :return Candlestick DataFrame
         """
-        return self._download_data(ticker=ticker, tf=tf, days=days)
-
-    def _download_data(self, ticker: str = 'BTCUSDT', tf: str = '1h', days: int = 10) -> pd.DataFrame():
-        if tf not in self.time_frames:
+        if interval not in self.time_frames:
             raise ValueError(f'Supported timeframes: {self.time_frames}')
-        start_date = _get_start_time(days=days)
-        klines = client.get_historical_klines(ticker, tf, start_date)
+        if days_of_data:
+            start_date = _get_start_time(days=days_of_data)
+            klines = binance_client.get_historical_klines(ticker, interval, start_date)
+        else:
+            klines = binance_client.get_historical_klines(ticker, interval, start_date, end_date)
         data = _convert_to_dataframe(klines)
-        data['symbol'] = ticker
         return data
+
+    def get_day_data(self, ticker: str = 'BTCUSDT', interval: str = '1h', date='2023-01-01'):
+        if interval not in self.time_frames:
+            raise ValueError(f'Supported timeframes: {self.time_frames}')
+        start_date = parse(date)
+        end_date = start_date + timedelta(minutes=1439)
+        start_date = start_date.strftime('%Y-%m-%d')
+        end_date = end_date.strftime('%Y-%m-%d %H:%M:%S')
+        klines = binance_client.get_historical_klines(ticker, interval, start_date, end_date)
+        data = _convert_to_dataframe(klines)
+        return data
+
+
+class TickDataset:
+    def __init__(self) -> None:
+        self.DATA_PATH = 'data/trades'
+
+    def _load_data_file(self, filename):
+        """Loads one data csv file."""
+        df = pd.read_csv(os.path.join(self.DATA_PATH, filename), delimiter=',', index_col=0).set_index('time')
+        df.index = pd.to_datetime(df.index, unit='ms', utc=True)
+        return df
+
+    def get_data(self, from_date: str, to_date: str, n_per_candle: int = 1000, divide_by: str = 'n_trades'):
+        """Get tick dataset from from_date to and including to_date"""
+        from_date = parse(from_date).date()
+        to_date = parse(to_date).date()
+        n_days = (to_date - from_date + timedelta(days=1)).days
+        df = pd.DataFrame()
+        for d in range(n_days):
+            date = from_date + timedelta(days=d)
+            filename = f'{date.__str__()}_BTCUSDT_binance_trades.csv'
+            df = pd.concat([df, self._load_data_file(filename)])
+        candles = pd.DataFrame()
+        if divide_by == 'n_trades':
+            for from_idx, to_idx in zip(range(0, len(df), n_per_candle), range(n_per_candle, len(df), n_per_candle)):
+                candles = pd.concat([candles, _aggr(df.iloc[from_idx:to_idx])])
+        elif divide_by == 'volume':
+            cum_volume = df['qty'].cumsum()
+            idxs = [0]
+            for vol in range(n_per_candle, int(cum_volume.iloc[-1]), n_per_candle):
+                idxs.append(np.argmax(cum_volume >= vol))
+            idxs = list(set(idxs))
+            idxs.sort()
+            for from_idx, to_idx in zip(idxs, idxs[1:]):
+                candles = pd.concat([candles, _aggr(df.iloc[from_idx:to_idx])])
+        else:
+            raise ValueError("Incorrect value entered for 'divide_by'. Correct values are 'n_trades' or 'volume'.")
+        return candles
+
+
+def _aggr(df):
+    """Aggregates the input order dataframe into one data point."""
+    new = {'time': df.index[-1], 'open': df['price'].iloc[0], 'high': df['price'].max(), 'low': df['price'].min(),
+           'close': df['price'].iloc[-1], 'volume': df['qty'].sum(), 'avg_volume': df['qty'].mean(),
+           'market_buy_volume': df[~ df['isBuyerMaker']]['qty'].sum(),
+           'market_sell_volume': df[df['isBuyerMaker']]['qty'].sum(), 'first_id': df['aggrID'].iloc[0],
+           'last_id': df['aggrID'].iloc[-1]}
+    new = pd.DataFrame(new, index=[0])
+    new = new.set_index('time', drop=True)
+    return new
 
 
 def _get_start_time(days: int) -> str:

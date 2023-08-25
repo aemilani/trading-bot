@@ -26,8 +26,10 @@ if __name__ == '__main__':
     while True:
         entry_ = float(input('\nEntry:'))
         sl_ = float(input('Stop Loss:'))
-        risk_ = float(input('Risk (percent of protfolio):')) / 100
+        risk_ = float(input('Risk (percent of portfolio):')) / 100
         max_pos_pct_ = float(input('Max position size (percent of portfolio):')) / 100
         position = get_position(entry_, sl_, risk_, max_pos_pct_)
         print(f'\nPosition size (percent of portfolio): {position[0]}')
         print(f'Leverage: {position[1]}')
+        if input('Quit? (y/[n])').lower() == 'y':
+            break

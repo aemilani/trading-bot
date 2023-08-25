@@ -6,3 +6,8 @@ mplfinance
 python-binance
 pandas-ta
 python-dotenv
+jupyterlab
+pycoingecko
+vectorbt
+flask
+pybit
