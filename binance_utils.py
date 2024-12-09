@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 from binance import Client
 from dotenv import dotenv_values
 

@@ -11,3 +11,4 @@ pycoingecko
 vectorbt
 flask
 pybit
+seaborn
