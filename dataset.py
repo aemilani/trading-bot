@@ -126,9 +126,9 @@ def _get_start_time(days: int) -> str:
 def _convert_to_dataframe(klines) -> pd.DataFrame():
     data = pd.DataFrame(
         data=[row[1:11] for row in klines],
-        columns=['open', 'high', 'low', 'close', 'volume', 'time', 'quote asset volume', 'number of trades',
+        columns=['open', 'high', 'low', 'close', 'volume', 'close_time', 'quote asset volume', 'number of trades',
                  'taker buy base asset volume', 'taker buy quote asset volume'],
-    ).set_index('time')
+    ).set_index('close_time')
 
     data.index = pd.to_datetime(np.round(data.index / 1000), unit='s')
     data = data.sort_index()
